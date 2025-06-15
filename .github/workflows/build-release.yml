@@ -28,10 +28,7 @@ jobs:
       run: uv python install 3.11
     
     - name: Install dependencies
-      run: uv sync
-    
-    - name: Install PyInstaller
-      run: uv add pyinstaller
+      run: uv sync --all-extras
       
     - name: Run tests
       run: |
