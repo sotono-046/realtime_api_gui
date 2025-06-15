@@ -151,7 +151,7 @@ class TestApplication:
         
         with patch("tkinter.messagebox.askyesno", return_value=True), \
              patch("tkinter.messagebox.showinfo") as mock_info, \
-             patch.object(tk_app, 'update'):
+             patch.object(tk_app.root, 'update'):
             
             tk_app.current_performer.set("テスト演者1")
             tk_app.mix_audio()
