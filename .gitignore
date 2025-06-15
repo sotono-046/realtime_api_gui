@@ -12,5 +12,20 @@ wheels/
 .vscode
 log/
 output/
+temp/
+
+# Config files (except releases)
 config/*
 !config/.gitkeep
+
+# Test and coverage files
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# PyInstaller spec files
+*.spec
+
+# Releases are tracked
+!releases/
