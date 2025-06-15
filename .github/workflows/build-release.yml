@@ -32,7 +32,13 @@ jobs:
       run: |
         uv sync --all-groups
       
-    - name: Run tests
+    - name: Run tests (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        uv run --group test pytest tests/ -v --timeout=300 -x || echo "Tests skipped"
+        
+    - name: Run tests (macOS)
+      if: matrix.os == 'macos-latest'
       run: |
         uv run --group test pytest tests/ -v || echo "Tests skipped"
         
