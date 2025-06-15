@@ -31,4 +31,4 @@ htmlcov/
 *.spec
 
 # Releases are tracked
-releases
+!releases/
