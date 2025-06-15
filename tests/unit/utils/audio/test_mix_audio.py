@@ -70,22 +70,31 @@ class TestMixAudio:
     @pytest.mark.unit
     def test_generate_premiere_xml_file_error(self, temp_dir):
         """XMLファイル生成時のファイルエラーテスト"""
+        import sys
+        
         input_file = temp_dir / "nonexistent.wav"
         output_xml = temp_dir / "readonly"
         
-        # 書き込み不可のディレクトリを作成
-        output_xml.mkdir()
-        output_xml.chmod(0o444)  # 読み取り専用
-        
-        try:
-            xml_output = output_xml / "test.xml"
-            result = generate_premiere_xml(str(input_file), str(xml_output))
-            
-            # エラーの場合はNoneが返されることを確認
+        # Windows環境では権限の扱いが異なるため、別のアプローチを使用
+        if sys.platform == "win32":
+            # Windowsでは存在しないディレクトリへの書き込みを試みる
+            output_xml = temp_dir / "nonexistent_dir" / "test.xml"
+            result = generate_premiere_xml(str(input_file), str(output_xml))
             assert result is None
-        finally:
-            # パーミッションを戻す
-            output_xml.chmod(0o755)
+        else:
+            # Unix系では元のテストを実行
+            output_xml.mkdir()
+            output_xml.chmod(0o444)  # 読み取り専用
+            
+            try:
+                xml_output = output_xml / "test.xml"
+                result = generate_premiere_xml(str(input_file), str(xml_output))
+                
+                # エラーの場合はNoneが返されることを確認
+                assert result is None
+            finally:
+                # パーミッションを戻す
+                output_xml.chmod(0o755)
 
     @pytest.mark.unit
     @patch("utils.audio.mix_audio.glob.glob")

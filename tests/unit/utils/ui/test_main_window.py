@@ -141,7 +141,7 @@ class TestApplication:
 
     @pytest.mark.unit
     @pytest.mark.gui
-    @patch("utils.ui.main_window.process_audio")
+    @patch("utils.audio.mix_audio.process_audio")
     def test_mix_audio_success(self, mock_process_audio, tk_app, temp_dir):
         """音声結合成功のテスト"""
         # モックの設定
@@ -207,7 +207,7 @@ class TestApplication:
         tk_app.current_performer.set("テスト演者1")
         
         with patch("tkinter.messagebox.askyesno", return_value=True), \
-             patch("utils.ui.main_window.process_audio", side_effect=Exception("テストエラー")), \
+             patch("utils.audio.mix_audio.process_audio", side_effect=Exception("テストエラー")), \
              patch("tkinter.messagebox.showerror") as mock_error:
             
             tk_app.mix_audio()
