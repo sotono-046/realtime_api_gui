@@ -79,6 +79,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Get all history for tag comparison
     
     - name: Download all artifacts
       uses: actions/download-artifact@v4
@@ -96,7 +98,13 @@ jobs:
         if [ -n "$PREV_TAG" ]; then
           COMMITS=$(git log --pretty=format:"- %s" $PREV_TAG..HEAD)
         else
-          COMMITS=$(git log --pretty=format:"- %s" HEAD~10..HEAD)
+          # For first release, show last 10 commits or all commits if less than 10
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          if [ $COMMIT_COUNT -lt 10 ]; then
+            COMMITS=$(git log --pretty=format:"- %s" HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"- %s" -n 10 HEAD)
+          fi
         fi
         
         # Create release notes
