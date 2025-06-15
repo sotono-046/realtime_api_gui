@@ -42,18 +42,15 @@ jobs:
       run: |
         uv run --group test pytest tests/ -v || echo "Tests skipped"
         
-    - name: Build executable
+    - name: Build executable (Windows)
+      if: matrix.os == 'windows-latest'
       run: |
-        uv run --group dev pyinstaller app.py \
-          --name realtime-api-gui \
-          --onefile \
-          --windowed \
-          --add-data "config:config" \
-          --hidden-import=PyQt6 \
-          --hidden-import=tkinter \
-          --hidden-import=websockets \
-          --hidden-import=openai \
-          --collect-all=PyQt6
+        uv run --group dev pyinstaller app.py --name realtime-api-gui --onefile --windowed --add-data "config;config" --hidden-import=PyQt6 --hidden-import=tkinter --hidden-import=websockets --hidden-import=openai --collect-all=PyQt6
+        
+    - name: Build executable (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        uv run --group dev pyinstaller app.py --name realtime-api-gui --onefile --windowed --add-data "config:config" --hidden-import=PyQt6 --hidden-import=tkinter --hidden-import=websockets --hidden-import=openai --collect-all=PyQt6
           
     - name: Create release directory
       run: mkdir -p release
