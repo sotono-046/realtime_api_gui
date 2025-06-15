@@ -8,7 +8,7 @@ import pytest
 import sys
 import os
 import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 
 try:
     from PyQt6.QtWidgets import QApplication, QTextEdit

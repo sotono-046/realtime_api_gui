@@ -5,12 +5,11 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QTextEdit,
-    QRadioButton,
     QPushButton,
-    QButtonGroup,
     QMessageBox,
     QApplication,
     QComboBox,
+    QProgressBar,
 )
 from PyQt6.QtCore import Qt
 import json
@@ -18,13 +17,19 @@ from datetime import datetime
 import os
 from models.voice_generator import VoiceGenerator
 from utils.logger import get_logger
-from utils.audio.mix_audio import process_audio
 
 # ロガーの取得
 logger = get_logger()
 
 # アプリケーションのルートディレクトリを取得
-ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+# PyInstaller で実行されている場合の対応
+import sys
+if getattr(sys, 'frozen', False):
+    # PyInstaller で実行されている場合
+    ROOT_DIR = sys._MEIPASS
+else:
+    # 通常の Python で実行されている場合
+    ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 
 class FocusTextEdit(QTextEdit):
@@ -51,13 +56,14 @@ class VoiceGeneratorGUI(QMainWindow):
         super().__init__()
         logger.info("アプリケーションを初期化中...")
         
-        # プロンプトの初期値を設定（後でJSONから読み込まれる）
-        self.prompts = {}
-        self.init_ui()
-        self.load_prompts()
-        
         # VoiceGeneratorを初期化（APIキーエラーの場合は設定ダイアログを表示）
         self.voice_generator = None
+        
+        # プロンプトの初期値を設定（後でJSONから読み込まれる）
+        self.prompts = {}
+        self.load_prompts()
+        self.init_ui()
+        
         self._initialize_voice_generator()
         
         logger.info("アプリケーションの初期化が完了しました")
@@ -137,9 +143,11 @@ class VoiceGeneratorGUI(QMainWindow):
         actor_layout.addWidget(actor_label)
 
         self.actor_combo = QComboBox()
-        self.actor_combo.addItems(list(self.prompts.keys()))
+        # プロンプトが存在する場合のみアイテムを追加
         if self.prompts:
+            self.actor_combo.addItems(list(self.prompts.keys()))
             self.actor_combo.setCurrentIndex(0)
+        # 接続は最後に設定
         self.actor_combo.currentTextChanged.connect(self.on_actor_changed)
         actor_layout.addWidget(self.actor_combo)
         actor_layout.addStretch()  # 残りのスペースを埋める
@@ -196,9 +204,29 @@ class VoiceGeneratorGUI(QMainWindow):
             first_actor = list(self.prompts.keys())[0]
             self.system_prompt.setText(self.prompts[first_actor]["system_prompt"])
 
-        # ステータス表示用のラベル
+        # プログレスバーとステータス表示
+        progress_layout = QVBoxLayout()
+        
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)  # 初期は非表示
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid grey;
+                border-radius: 5px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+                border-radius: 3px;
+            }
+        """)
+        progress_layout.addWidget(self.progress_bar)
+        
         self.status_label = QLabel("")
-        layout.addWidget(self.status_label)
+        self.status_label.setStyleSheet("QLabel { color: #333; font-weight: bold; }")
+        progress_layout.addWidget(self.status_label)
+        
+        layout.addLayout(progress_layout)
 
     def get_current_actor(self):
         return self.actor_combo.currentText() if hasattr(self, "actor_combo") else None
@@ -208,44 +236,71 @@ class VoiceGeneratorGUI(QMainWindow):
             # システムプロンプトを更新
             self.system_prompt.setText(self.prompts[actor]["system_prompt"])
             # 音声設定を更新
-            if self.voice_generator:
+            if hasattr(self, 'voice_generator') and self.voice_generator:
                 self.voice_generator.set_actor(actor)
                 logger.info(f"演者を切り替え: {actor}")
 
     def generate_voice(self):
         try:
-            self.status_label.setText("音声生成中...")
+            # プログレスバーとステータス表示を開始
+            self.progress_bar.setVisible(True)
+            self.progress_bar.setRange(0, 0)  # 不確定なプログレス
+            self.status_label.setText("🎤 音声生成中...")
+            self.status_label.setStyleSheet("QLabel { color: #2196F3; font-weight: bold; }")
             self.generate_btn.setEnabled(False)
+            self.play_btn.setEnabled(False)
+            self.save_btn.setEnabled(False)
             QApplication.processEvents()  # UIを更新
 
             # VoiceGeneratorが初期化されているかチェック
             if not self.voice_generator:
-                msg = "APIキーが設定されていません。設定画面でAPIキーを設定してください。"
+                msg = "⚠️ APIキーが設定されていません。設定画面でAPIキーを設定してください。"
                 logger.warning(msg)
                 self.status_label.setText(msg)
+                self.status_label.setStyleSheet("QLabel { color: #FF9800; font-weight: bold; }")
                 self._show_api_key_setup()
+                self._reset_ui_state()
                 return
             
             text = self.text_input.toPlainText()
             if not text.strip():
-                msg = "セリフが入力されていません"
+                msg = "⚠️ セリフが入力されていません"
                 logger.warning(msg)
                 self.status_label.setText(msg)
+                self.status_label.setStyleSheet("QLabel { color: #FF9800; font-weight: bold; }")
+                self._reset_ui_state()
                 return
+
+            # プログレスコールバック関数
+            def update_progress(message):
+                self.status_label.setText(message)
+                QApplication.processEvents()
 
             self.voice_generator.generate_voice(
                 self.system_prompt.toPlainText(),
                 self.acting_prompt.toPlainText(),
                 text,
+                progress_callback=update_progress
             )
+            
+            # 生成完了
+            self.status_label.setText("✅ 音声生成完了")
+            self.status_label.setStyleSheet("QLabel { color: #4CAF50; font-weight: bold; }")
             self.play_voice()
-            self.status_label.setText("音声生成完了")
         except Exception as e:
-            error_msg = f"音声生成エラー: {str(e)}"
+            error_msg = f"❌ 音声生成エラー: {str(e)}"
             logger.error(error_msg, exc_info=True)
             self.status_label.setText(error_msg)
+            self.status_label.setStyleSheet("QLabel { color: #F44336; font-weight: bold; }")
         finally:
-            self.generate_btn.setEnabled(True)
+            self._reset_ui_state()
+
+    def _reset_ui_state(self):
+        """UIの状態をリセット"""
+        self.progress_bar.setVisible(False)
+        self.generate_btn.setEnabled(True)
+        self.play_btn.setEnabled(True)
+        self.save_btn.setEnabled(True)
 
     def play_voice(self):
         try:

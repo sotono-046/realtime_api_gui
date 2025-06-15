@@ -7,9 +7,7 @@
 import pytest
 import os
 import json
-import tempfile
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
+from unittest.mock import Mock, patch
 
 from models.voice_generator import VoiceGenerator
 

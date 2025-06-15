@@ -5,7 +5,6 @@
 """
 
 import os
-import sys
 from models.voice_generator import VoiceGenerator
 from utils.logger import get_logger
 
@@ -67,10 +66,7 @@ def main():
     print("=" * 50)
     
     # 環境チェック
-    if not os.getenv('OPENAI_API_KEY'):
-        print("❌ OPENAI_API_KEYが設定されていません")
-        print("   .envファイルにAPIキーを設定してください")
-        return
+    print("ℹ️  APIキーはGUI設定ファイルまたは環境変数から読み込まれます")
     
     # テスト実行
     success = test_voice_generation()

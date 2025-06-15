@@ -206,7 +206,7 @@ def test_mix_audio_button(performer, clean=True, date=None, view_results=False):
                 show_results(mixed_file, xml_file)
 
         else:
-            logger.error(f"テスト失敗: 結合ファイルまたはXMLファイルが見つかりません")
+            logger.error("テスト失敗: 結合ファイルまたはXMLファイルが見つかりません")
             if not os.path.exists(mixed_file):
                 logger.error(f"結合ファイルが見つかりません: {mixed_file}")
             if not os.path.exists(xml_file):
@@ -217,7 +217,7 @@ def test_mix_audio_button(performer, clean=True, date=None, view_results=False):
             mixed_dir = os.path.dirname(mixed_file)
             clean_test_files(performer, date, mixed_dir)
         elif not clean and view_results:
-            print(f"\n🔍 生成されたファイルは以下のディレクトリに保存されています:")
+            print("\n🔍 生成されたファイルは以下のディレクトリに保存されています:")
             print(f"   {os.path.dirname(mixed_file)}\n")
 
         logger.info(f"===== 音声結合テスト終了: {'成功' if success else '失敗'} =====")

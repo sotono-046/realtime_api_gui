@@ -9,7 +9,7 @@ import sys
 import os
 import tkinter as tk
 import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 # Tkinter GUI テストをスキップする条件
 def skip_if_no_display():

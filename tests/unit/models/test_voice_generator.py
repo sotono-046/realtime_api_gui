@@ -7,9 +7,7 @@ VoiceGeneratorクラスのユニットテスト
 import pytest
 import os
 import json
-import tempfile
-from unittest.mock import Mock, patch, MagicMock, mock_open
-from pathlib import Path
+from unittest.mock import Mock, patch, mock_open
 
 from models.voice_generator import VoiceGenerator
 

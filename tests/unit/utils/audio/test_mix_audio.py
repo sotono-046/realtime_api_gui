@@ -5,11 +5,9 @@
 """
 
 import pytest
-import os
 import numpy as np
 import xml.etree.ElementTree as ET
-from unittest.mock import Mock, patch, mock_open
-from pathlib import Path
+from unittest.mock import patch
 
 from utils.audio.mix_audio import generate_premiere_xml, process_audio
 

@@ -4,8 +4,22 @@ import os
 from datetime import datetime
 
 # ログディレクトリの作成
-log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "log")
-os.makedirs(log_dir, exist_ok=True)
+# PyInstaller 実行時は書き込み可能なディレクトリを使用
+import sys
+if getattr(sys, 'frozen', False):
+    # PyInstaller で実行されている場合
+    import tempfile
+    log_dir = os.path.join(tempfile.gettempdir(), "realtime_api_gui", "log")
+else:
+    # 通常の Python で実行されている場合
+    log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "log")
+
+try:
+    os.makedirs(log_dir, exist_ok=True)
+except PermissionError:
+    # 権限エラーの場合、システムの一時ディレクトリを使用
+    import tempfile
+    log_dir = tempfile.gettempdir()
 
 # ログファイル名の設定（現在の日付を使用）
 current_date = datetime.now().strftime("%Y-%m-%d")

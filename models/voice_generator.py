@@ -1,11 +1,10 @@
 import os
-from pathlib import Path
+import sys
 import tempfile
 from datetime import datetime
 import soundfile as sf
 import sounddevice as sd
 from openai import OpenAI
-from dotenv import load_dotenv, find_dotenv
 from utils.logger import get_logger
 from websocket._app import WebSocketApp
 import json
@@ -16,15 +15,14 @@ import wave
 logger = get_logger()
 
 # アプリケーションのルートディレクトリを取得
-ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-
-# .envファイルを検索して読み込む
-dotenv_path = find_dotenv(usecwd=True)
-if dotenv_path:
-    load_dotenv(dotenv_path, override=True)
-    logger.info(f".envファイルを読み込みました: {dotenv_path}")
+# PyInstaller で実行されている場合の対応
+if getattr(sys, 'frozen', False):
+    # PyInstaller で実行されている場合
+    ROOT_DIR = sys._MEIPASS
 else:
-    logger.warning(".envファイルが見つかりませんでした")
+    # 通常の Python で実行されている場合
+    ROOT_DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+
 
 
 class VoiceGenerator:
@@ -39,7 +37,7 @@ class VoiceGenerator:
         if not api_key:
             logger.error("OPENAI_API_KEYが設定されていません")
             raise ValueError(
-                "OPENAI_API_KEYが設定されていません。GUI設定または.envファイルを確認してください。"
+                "OPENAI_API_KEYが設定されていません。GUI設定でAPIキーを設定してください。"
             )
 
         # WebSocket接続の設定
@@ -96,8 +94,20 @@ class VoiceGenerator:
                 logger.warning(f"一時ファイルの削除に失敗しました: {e}")
 
         # tempモジュールを使用して一時ファイルを作成
-        temp_dir = os.path.join(ROOT_DIR, "temp")
-        os.makedirs(temp_dir, exist_ok=True)
+        # 実行ファイル内では書き込み可能なディレクトリを使用
+        if getattr(sys, 'frozen', False):
+            # PyInstaller で実行されている場合
+            temp_dir = tempfile.gettempdir()
+            temp_dir = os.path.join(temp_dir, "realtime_api_gui")
+        else:
+            # 通常の Python で実行されている場合
+            temp_dir = os.path.join(ROOT_DIR, "temp")
+        
+        try:
+            os.makedirs(temp_dir, exist_ok=True)
+        except PermissionError:
+            # 権限エラーの場合、システムの一時ディレクトリを使用
+            temp_dir = tempfile.gettempdir()
 
         self.temp_file = tempfile.mktemp(suffix=".wav", dir=temp_dir)
         logger.debug(f"一時ファイルを作成: {self.temp_file}")
@@ -210,13 +220,17 @@ class VoiceGenerator:
         ws.send(json.dumps(message))
         ws.send(json.dumps({"type": "response.create"}))
 
-    def generate_voice(self, system_prompt: str, acting_prompt: str, text: str) -> str:
+    def generate_voice(self, system_prompt: str, acting_prompt: str, text: str, progress_callback=None) -> str:
         """音声を生成する"""
         if not self.current_actor:
             logger.error("演者が設定されていません")
             raise ValueError(
                 "演者が設定されていません。set_actorを呼び出してください。"
             )
+        
+        # 進行状況コールバック
+        if progress_callback:
+            progress_callback("🎯 演者設定を確認中...")
 
         # 現在の演者の音声設定を取得
         if self.current_actor in self.performer_configs and "voice" in self.performer_configs[self.current_actor]:
@@ -231,10 +245,14 @@ class VoiceGenerator:
 
         try:
             # プロンプトとテキストを保存
+            if progress_callback:
+                progress_callback("📝 プロンプトを準備中...")
             self.current_system_prompt = system_prompt
             self.current_text = f"{acting_prompt}\n「{text}」"
 
             # WebSocket接続を確立
+            if progress_callback:
+                progress_callback("🔗 WebSocket接続を確立中...")
             self.ws = WebSocketApp(
                 self.ws_url,
                 header=self.ws_headers,
@@ -243,6 +261,9 @@ class VoiceGenerator:
                 on_close=self._on_close,
                 on_open=self._on_open,
             )
+            
+            if progress_callback:
+                progress_callback("🎵 音声データを受信中...")
             self.ws.run_forever()
 
             # 接続が閉じられた後に一時ファイルが存在することを確認
@@ -263,8 +284,22 @@ class VoiceGenerator:
         timestamp = datetime.now().strftime("%m%d_%H%M%S")
 
         # 演者のディレクトリを作成
-        actor_dir = os.path.join(ROOT_DIR, actor)
-        os.makedirs(actor_dir, exist_ok=True)
+        # 実行ファイル内では書き込み可能なディレクトリを使用
+        if getattr(sys, 'frozen', False):
+            # PyInstaller で実行されている場合
+            save_dir = os.path.expanduser(f"~/Documents/realtime_api_gui_output")
+            actor_dir = os.path.join(save_dir, actor)
+        else:
+            # 通常の Python で実行されている場合
+            actor_dir = os.path.join(ROOT_DIR, actor)
+        
+        try:
+            os.makedirs(actor_dir, exist_ok=True)
+        except PermissionError:
+            # 権限エラーの場合、デスクトップに保存
+            actor_dir = os.path.join(os.path.expanduser("~/Desktop"), f"realtime_api_gui_{actor}")
+            os.makedirs(actor_dir, exist_ok=True)
+            logger.warning(f"権限エラーのため、保存先を変更しました: {actor_dir}")
 
         save_path = os.path.join(actor_dir, f"{actor}_{timestamp}.wav")
         try:

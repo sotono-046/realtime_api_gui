@@ -4,8 +4,6 @@
 import os
 import sys
 import glob
-import shutil
-import subprocess
 from datetime import datetime
 import soundfile as sf
 import numpy as np
