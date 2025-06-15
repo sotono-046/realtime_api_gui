@@ -12,7 +12,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-latest, macos-latest]
         
     runs-on: ${{ matrix.os }}
     
@@ -61,12 +61,6 @@ jobs:
         cp dist/realtime-api-gui release/realtime-api-gui-macos
         chmod +x release/realtime-api-gui-macos
         
-    - name: Copy executable (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        cp dist/realtime-api-gui release/realtime-api-gui-linux
-        chmod +x release/realtime-api-gui-linux
-        
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -90,7 +84,6 @@ jobs:
         files: |
           artifacts/realtime-api-gui-windows-latest/realtime-api-gui-windows.exe
           artifacts/realtime-api-gui-macos-latest/realtime-api-gui-macos
-          artifacts/realtime-api-gui-ubuntu-latest/realtime-api-gui-linux
         draft: false
         prerelease: false
       env:
