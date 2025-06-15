@@ -32,3 +32,4 @@ htmlcov/
 
 # Releases are tracked
 !releases/
+.DS_Store
