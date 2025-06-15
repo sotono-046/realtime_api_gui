@@ -14,9 +14,12 @@ log/
 output/
 temp/
 
-# Config files (except releases)
+# Config files (except releases and prompts)
 config/*
 !config/.gitkeep
+!config/prompts.json
+# Exclude sensitive settings
+config/settings.json
 
 # Test and coverage files
 .coverage
@@ -28,4 +31,4 @@ htmlcov/
 *.spec
 
 # Releases are tracked
-!releases/
+releases

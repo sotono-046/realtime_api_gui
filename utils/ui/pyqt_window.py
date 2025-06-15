@@ -50,16 +50,48 @@ class VoiceGeneratorGUI(QMainWindow):
     def __init__(self):
         super().__init__()
         logger.info("アプリケーションを初期化中...")
-        self.voice_generator = VoiceGenerator()
+        
         # プロンプトの初期値を設定（後でJSONから読み込まれる）
         self.prompts = {}
         self.init_ui()
         self.load_prompts()
-
-        # 初期の演者を設定
-        first_actor = list(self.prompts.keys())[0]
-        self.voice_generator.set_actor(first_actor)
+        
+        # VoiceGeneratorを初期化（APIキーエラーの場合は設定ダイアログを表示）
+        self.voice_generator = None
+        self._initialize_voice_generator()
+        
         logger.info("アプリケーションの初期化が完了しました")
+    
+    def _initialize_voice_generator(self):
+        """VoiceGeneratorを初期化（APIキーエラー時は設定ダイアログを表示）"""
+        try:
+            self.voice_generator = VoiceGenerator()
+            # 初期の演者を設定
+            if self.prompts:
+                first_actor = list(self.prompts.keys())[0]
+                self.voice_generator.set_actor(first_actor)
+        except ValueError as e:
+            if "OPENAI_API_KEY" in str(e):
+                logger.warning("APIキーが設定されていないため、設定ダイアログを表示します")
+                self.status_label.setText("APIキーが設定されていません。設定画面を開いてください。")
+                
+                # 設定ダイアログを自動で開く
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(1000, self._show_api_key_setup)
+            else:
+                raise
+    
+    def _show_api_key_setup(self):
+        """APIキー設定ダイアログを表示"""
+        reply = QMessageBox.question(
+            self,
+            "APIキー設定",
+            "OpenAI APIキーが設定されていません。\n設定画面を開きますか？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.open_settings()
 
     def load_prompts(self):
         try:
@@ -176,8 +208,9 @@ class VoiceGeneratorGUI(QMainWindow):
             # システムプロンプトを更新
             self.system_prompt.setText(self.prompts[actor]["system_prompt"])
             # 音声設定を更新
-            self.voice_generator.set_actor(actor)
-            logger.info(f"演者を切り替え: {actor}")
+            if self.voice_generator:
+                self.voice_generator.set_actor(actor)
+                logger.info(f"演者を切り替え: {actor}")
 
     def generate_voice(self):
         try:
@@ -185,6 +218,14 @@ class VoiceGeneratorGUI(QMainWindow):
             self.generate_btn.setEnabled(False)
             QApplication.processEvents()  # UIを更新
 
+            # VoiceGeneratorが初期化されているかチェック
+            if not self.voice_generator:
+                msg = "APIキーが設定されていません。設定画面でAPIキーを設定してください。"
+                logger.warning(msg)
+                self.status_label.setText(msg)
+                self._show_api_key_setup()
+                return
+            
             text = self.text_input.toPlainText()
             if not text.strip():
                 msg = "セリフが入力されていません"
@@ -208,6 +249,9 @@ class VoiceGeneratorGUI(QMainWindow):
 
     def play_voice(self):
         try:
+            if not self.voice_generator:
+                self.status_label.setText("APIキーが設定されていません")
+                return
             self.voice_generator.play_audio()
         except Exception as e:
             error_msg = f"音声再生エラー: {str(e)}"
@@ -216,6 +260,9 @@ class VoiceGeneratorGUI(QMainWindow):
 
     def save_voice(self):
         try:
+            if not self.voice_generator:
+                self.status_label.setText("APIキーが設定されていません")
+                return
             actor = self.get_current_actor()
             if actor:
                 saved_path = self.voice_generator.save_voice(actor)
@@ -347,6 +394,13 @@ class VoiceGeneratorGUI(QMainWindow):
             # ボイスジェネレータの設定も更新
             if hasattr(self.voice_generator, 'load_performer_configs'):
                 self.voice_generator.performer_configs = self.voice_generator.load_performer_configs()
+            
+            # VoiceGeneratorを再初期化（APIキー設定が更新された可能性があるため）
+            try:
+                self._initialize_voice_generator()
+                logger.info("VoiceGeneratorが再初期化されました")
+            except Exception as e:
+                logger.error(f"VoiceGeneratorの再初期化に失敗: {e}")
             
             logger.info("設定が更新されました")
             self.status_label.setText("設定が更新されました")

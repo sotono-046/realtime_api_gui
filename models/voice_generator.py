@@ -35,11 +35,11 @@ class VoiceGenerator:
     }
 
     def __init__(self):
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = self._get_api_key()
         if not api_key:
             logger.error("OPENAI_API_KEYが設定されていません")
             raise ValueError(
-                "OPENAI_API_KEYが設定されていません。.envファイルを確認してください。"
+                "OPENAI_API_KEYが設定されていません。GUI設定または.envファイルを確認してください。"
             )
 
         # WebSocket接続の設定
@@ -63,6 +63,29 @@ class VoiceGenerator:
         self.performer_configs = self.load_performer_configs()
         
         logger.info("VoiceGeneratorが初期化されました")
+    
+    def _get_api_key(self):
+        """APIキーを取得（GUI設定ファイル → 環境変数の順で確認）"""
+        # 1. GUI設定ファイルから取得を試行
+        try:
+            settings_file = os.path.join(ROOT_DIR, 'config', 'settings.json')
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                    api_key = settings.get('openai_api_key', '').strip()
+                    if api_key:
+                        logger.info("GUI設定からAPIキーを読み込みました")
+                        return api_key
+        except Exception as e:
+            logger.warning(f"GUI設定ファイルの読み込みに失敗: {e}")
+        
+        # 2. 環境変数から取得
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            logger.info("環境変数からAPIキーを読み込みました")
+            return api_key.strip()
+        
+        return None
 
     def _create_temp_file(self):
         """一時ファイルを作成する"""

@@ -3,7 +3,8 @@ import os
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QListWidget, QTextEdit, QLineEdit, QComboBox, QDoubleSpinBox,
-    QMessageBox, QSplitter, QWidget, QListWidgetItem
+    QMessageBox, QSplitter, QWidget, QListWidgetItem, QTabWidget,
+    QFormLayout, QGroupBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from utils.logger import get_logger
@@ -25,6 +26,10 @@ class PerformerSettingsDialog(QDialog):
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             'config', 'prompts.json'
         )
+        self.settings_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            'config', 'settings.json'
+        )
         
         # 演者設定データ
         self.performers = {}
@@ -32,9 +37,83 @@ class PerformerSettingsDialog(QDialog):
         
         self.init_ui()
         self.load_performers()
+        self.load_api_settings()
         
     def init_ui(self):
         """UIを初期化"""
+        layout = QVBoxLayout()
+        
+        # タブウィジェット
+        tab_widget = QTabWidget()
+        
+        # APIキー設定タブ
+        self.create_api_key_tab(tab_widget)
+        
+        # 演者設定タブ
+        self.create_performer_tab(tab_widget)
+        
+        layout.addWidget(tab_widget)
+        
+        # ボタン
+        button_layout = QHBoxLayout()
+        
+        save_button = QPushButton("保存")
+        save_button.clicked.connect(self.save_settings)
+        
+        cancel_button = QPushButton("キャンセル")
+        cancel_button.clicked.connect(self.reject)
+        
+        button_layout.addStretch()
+        button_layout.addWidget(save_button)
+        button_layout.addWidget(cancel_button)
+        
+        layout.addLayout(button_layout)
+        self.setLayout(layout)
+    
+    def create_api_key_tab(self, tab_widget):
+        """APIキー設定タブを作成"""
+        api_tab = QWidget()
+        api_layout = QVBoxLayout()
+        
+        # APIキー設定グループ
+        api_group = QGroupBox("OpenAI API設定")
+        api_group_layout = QFormLayout()
+        
+        # APIキー入力
+        self.api_key_input = QLineEdit()
+        self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.api_key_input.setPlaceholderText("sk-...")
+        api_group_layout.addRow("APIキー:", self.api_key_input)
+        
+        # 表示/非表示ボタン
+        show_hide_btn = QPushButton("表示")
+        show_hide_btn.setCheckable(True)
+        show_hide_btn.toggled.connect(self.toggle_api_key_visibility)
+        api_group_layout.addRow("", show_hide_btn)
+        
+        # APIキーの説明
+        info_label = QLabel("""
+APIキーの取得方法:
+1. https://platform.openai.com/api-keys にアクセス
+2. 「Create new secret key」をクリック
+3. 生成されたキーをコピーして上記に貼り付け
+
+注意: APIキーは安全に管理してください。
+""")
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; font-size: 10px;")
+        api_group_layout.addRow(info_label)
+        
+        api_group.setLayout(api_group_layout)
+        api_layout.addWidget(api_group)
+        api_layout.addStretch()
+        
+        api_tab.setLayout(api_layout)
+        tab_widget.addTab(api_tab, "API設定")
+    
+    def create_performer_tab(self, tab_widget):
+        """演者設定タブを作成"""
+        performer_tab = QWidget()
         layout = QVBoxLayout()
         
         # メインスプリッター
@@ -113,23 +192,18 @@ class PerformerSettingsDialog(QDialog):
         
         layout.addWidget(main_splitter)
         
-        # ボタン
-        button_layout = QHBoxLayout()
-        self.save_btn = QPushButton("保存")
-        self.cancel_btn = QPushButton("キャンセル")
-        self.save_btn.clicked.connect(self.save_settings)
-        self.cancel_btn.clicked.connect(self.reject)
-        
-        button_layout.addStretch()
-        button_layout.addWidget(self.save_btn)
-        button_layout.addWidget(self.cancel_btn)
-        
-        layout.addLayout(button_layout)
-        
-        self.setLayout(layout)
+        performer_tab.setLayout(layout)
+        tab_widget.addTab(performer_tab, "演者設定")
         
         # 初期状態では詳細設定を無効化
         self.set_detail_enabled(False)
+    
+    def toggle_api_key_visibility(self, show):
+        """APIキーの表示/非表示を切り替え"""
+        if show:
+            self.api_key_input.setEchoMode(QLineEdit.EchoMode.Normal)
+        else:
+            self.api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         
     def set_detail_enabled(self, enabled):
         """詳細設定の有効/無効を切り替え"""
@@ -281,6 +355,53 @@ class PerformerSettingsDialog(QDialog):
             self.current_performer = None
             self.set_detail_enabled(False)
             
+    def load_api_settings(self):
+        """API設定を読み込み"""
+        try:
+            if os.path.exists(self.settings_file):
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+                    api_key = settings.get('openai_api_key', '')
+                    self.api_key_input.setText(api_key)
+                    logger.info("API設定を読み込みました")
+        except Exception as e:
+            logger.error(f"API設定の読み込みに失敗: {str(e)}")
+    
+    def save_api_settings(self):
+        """API設定を保存"""
+        try:
+            # 設定ファイルのディレクトリが存在しない場合は作成
+            config_dir = os.path.dirname(self.settings_file)
+            if not os.path.exists(config_dir):
+                os.makedirs(config_dir, exist_ok=True)
+            
+            # 既存の設定を読み込み
+            settings = {}
+            if os.path.exists(self.settings_file):
+                with open(self.settings_file, 'r', encoding='utf-8') as f:
+                    settings = json.load(f)
+            
+            # APIキーを更新
+            settings['openai_api_key'] = self.api_key_input.text().strip()
+            
+            # JSONファイルに保存
+            with open(self.settings_file, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, ensure_ascii=False, indent=4)
+                
+            logger.info("API設定を保存しました")
+            
+            # .envファイルも更新（環境変数として利用できるように）
+            env_file = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                '.env'
+            )
+            with open(env_file, 'w', encoding='utf-8') as f:
+                f.write(f"OPENAI_API_KEY={settings['openai_api_key']}\n")
+            
+        except Exception as e:
+            logger.error(f"API設定の保存に失敗: {str(e)}")
+            raise
+    
     def save_settings(self):
         """設定を保存"""
         try:
@@ -289,12 +410,15 @@ class PerformerSettingsDialog(QDialog):
             if not os.path.exists(config_dir):
                 os.makedirs(config_dir, exist_ok=True)
                 
-            # JSONファイルに保存
+            # 演者設定を保存
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.performers, f, ensure_ascii=False, indent=4)
+            
+            # API設定を保存
+            self.save_api_settings()
                 
-            logger.info("演者設定を保存しました")
-            QMessageBox.information(self, "保存完了", "演者設定を保存しました。")
+            logger.info("設定を保存しました")
+            QMessageBox.information(self, "保存完了", "設定を保存しました。")
             
             # 設定変更を通知
             self.settings_changed.emit()
